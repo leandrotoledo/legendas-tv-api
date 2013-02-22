@@ -3,6 +3,7 @@
 from BeautifulSoup import BeautifulSoup
 import re
 import requests
+import sys
 
 
 class Legenda(object):
@@ -78,7 +79,7 @@ class LegendasTV(object):
         legendas = []
 
         html = BeautifulSoup(data)
-        results = html.find(id='conteudodest').findAll('span')
+        results = html.find(id='conteudodest').findAll('span') # TODO: Pagination
         for result in results:
             meta = self.LEGENDA_REGEX.search(unicode(result))
             if meta:
@@ -86,6 +87,7 @@ class LegendasTV(object):
                 legendas.append(legenda)
             else: pass # raise exception
 
+        legendas = sorted(legendas, key=lambda k: int(k.downloads), reverse=True)
         return legendas
 
     def search(self, q, lang='pt-br', tipo='release'):
@@ -103,14 +105,50 @@ class LegendasTV(object):
                   'selTipo':    self.LEGENDA_TIPO[tipo] }
 
         r = self._request(self.URL_BUSCA, method='POST', data=busca)
-        legenda = self._parser(r.text)[0]
+        if r:
+            legendas = self._parser(r.text)
+        else: pass # raise exception
 
+        return legendas
+
+    def download(self, legenda, output):
+        if not legenda and isinstance(legenda, Legenda):
+            pass # raise exception
+
+        if not output:
+            pass # raise exception
+        
         r = self._request(legenda.download)
-        filename = r.url.split('/')[-1] # TODO
-        with open('/home/leandrotoledo/Downloads/' + filename, 'wb') as handle:
-	    print u'Downloading:', legenda
-            handle.write(r.content)
+        if r:
+            filename = r.url.split('/')[-1] # FIX
+            path = output + filename
+            with open(path, 'wb') as handle:
+	        print u'Baixando legenda:', legenda
+                handle.write(r.content)
 
 
-ltv = LegendasTV('toledd31', 'd4g6970')
-ltv.search('A Time to Kill YIFY')
+def main():
+    q = sys.argv[1]	 # Query
+    output = sys.argv[2] # FIX /
+
+    # Auth
+    ltv = LegendasTV('usuário', 'senha')
+
+    # Search
+    print '\t[ downloads ]\t\t[ filename ]'
+    i = 0
+    legendas = ltv.search(q)
+    for legenda in legendas:
+        print '(%d)\t%s\t\t\t%s' % (i+1, legenda.downloads, legenda.filename) # FIX +1
+        i += 1
+    print
+
+    # Download
+    opt = int(raw_input('Escolha a legenda para baixar: '))-1 # FIX -1
+    if legendas[opt]:
+        ltv.download(legendas[opt], output)
+    else: pass # raise exception
+
+if __name__ == '__main__':
+    main()
+
